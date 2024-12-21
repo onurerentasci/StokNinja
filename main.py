@@ -14,6 +14,7 @@ load_dotenv()
 
 TOKEN: Final = os.getenv('TELEGRAM_TOKEN')
 BOT_USERNAME: Final = os.getenv('BOT_USERNAME')
+TEST_PAGE_URL: Final = os.getenv('TEST_PAGE_URL')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -29,9 +30,9 @@ WEBSITE_SELECTORS = {
 
 def get_website_name(url: str) -> str:
     domain = urlparse(url).netloc.lower()
-    if any(site in domain for site in ['trendyol', 'trendyolmilla']):
+    if any(site in domain for site in ['trendyol', 'trendyolmilla', ]):
         return 'trendyol'
-    elif 'telegramtestpage.vercel.app' in domain:
+    elif TEST_PAGE_URL in domain:
         return 'testpage'
     # elif 'zara' in domain:
     #     return 'zara'
@@ -43,8 +44,21 @@ def get_website_name(url: str) -> str:
         return 'unknown'
 
 
+async def resolve_shortened_url(url: str) -> str:
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.get(url)
+            return str(response.url)
+    except Exception as e:
+        logging.error(f"URL çözümleme hatası: {str(e)}")
+        return url
+
 async def check_stock(url: str) -> str:
     try:
+        if 'ty.gl' in url:
+            url = await resolve_shortened_url(url)
+            logging.info(f"Resolved URL: {url}")
+
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
@@ -153,10 +167,10 @@ async def remove_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text: str = update.message.text
+    text: str = update.message.text.strip()
     chat_id = update.effective_chat.id
 
-    if 'http' in text.lower():
+    if 'http' in text.lower() or 'ty.gl' in text.lower():
         response = await check_stock(text)
         product_links[text] = {
             'chat_id': chat_id,
