@@ -55,20 +55,23 @@ async def resolve_shortened_url(url: str) -> str:
 
 async def check_stock(url: str) -> str:
     try:
-        if 'ty.gl' in url:
+        original_url = url
+        if 'ty.gl' in url.lower():
             url = await resolve_shortened_url(url)
             logging.info(f"Resolved URL: {url}")
+            if url == original_url:
+                return 'URL çözümlenemedi. Lütfen geçerli bir link gönderiniz.'
 
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.get(url, headers=headers)
-            website = get_website_name(url)
+            website = get_website_name(str(response.url))
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            logging.info(f"URL: {url}")
+            logging.info(f"Final URL: {response.url}")
             logging.info(f"Website: {website}")
             
             if website in ['trendyol', 'trendyoMilla', 'testpage']:
